@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 	unsigned short int erro ;
 	short int contI, contO, contD, caso1 ;
 	float histograma1[256] ; 
-	long n, contVet1, contVet2, i, j, menor ;
+	long n, contVet, i, j, menor ;
 	char *nomeImagem, *saidaImagem, *nomeDiretorio, *concat ;
 	
 	if (argc < 5) {
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 	contI = 0 ;
 	contO = 0 ;
 	contD = 0 ;
-	contVet1 = 0 ;
+	contVet = 0 ;
 	i = 1 ;
 	// Verifica se é para gerar imagem ou comparar com outras imagens
 	caso1 = 0 ;
@@ -90,13 +90,12 @@ int main(int argc, char *argv[]) {
 			// Conta a quantidade de arquivos no diretorio
 			while ((entrada = readdir(dir)) != NULL) {
 				if ((entrada->d_type == DT_REG) ) {
-					contVet1++ ;
+					contVet++ ;
 				}
 			}
-			contVet2 = contVet1 ;
 			// Cria um vetor com essa quantidade para o calculo da distancia
 			// cartesiana para cada uma das imagens
-			diretorio = malloc(contVet1 * sizeof(struct imagensDiretorio)) ;
+			diretorio = malloc(contVet * sizeof(struct imagensDiretorio)) ;
 			if (!diretorio) {
 				printf("Erro ao criar vetor de distancias\n") ;
 				return 1 ;
@@ -128,27 +127,31 @@ int main(int argc, char *argv[]) {
 		i = 0 ;
 		while ((entrada = readdir(dir)) != NULL) {
 			if ((entrada->d_type == DT_REG)) {	
-				n = strlen (nomeImagem) ;
+				// Verifica se a imagem é do tipo PGM, caso não 'continue'
+			
+				n = strlen (entrada->d_name) ;
 				j = strlen (nomeDiretorio) ;
 				// Cria uma nova string com espaço pra concatenar ambas
 				concat = (char*)malloc((n+j+1)) ;
 				strcpy(concat, nomeDiretorio) ;
-				strcat(concat, nomeImagem) ;
+				strcat(concat, entrada->d_name) ;
 				concat[n+j] = '\0' ;
-				erro = criaMatrizDeImagem(concat, &imagemDiretorio) ;
+				erro = criaMatrizDeImagem(concat, &imagemDiretorio) ; 
 				if (erro) {
-					contVet2-- ;
+					contVet-- ;
 					continue ;
 				}
 				criaMatrizLBP(imagemDiretorio, &LBP1) ;
 				criaHistograma(LBP1, diretorio[i].histograma) ;
 				strcpy(diretorio[i].nome, entrada->d_name) ;
 				diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
+				liberaMatriz(imagemDiretorio) ;
+				liberaMatriz(LBP1) ;
 				i++ ;
 			}	
 		}
 		menor = 0;
-		for (j = 0; j < contVet2; j++) {
+		for (j = 0; j < i; j++) {
 			if(diretorio[menor].distancia > diretorio[j].distancia){
 				menor = j;
 			}
