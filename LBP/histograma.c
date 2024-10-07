@@ -1,27 +1,38 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <ctype.h>
 
 #include "histograma.h"
 
-// Retorna uma struct imagem_t com informações do arquivo da imagem
-struct imagem_t criaMatrizDeImagem(char *nomeDoArquivo) {
+void liberaMatriz(struct imagem_t imagem) {
+	int i ;
+	
+	for (i = 0; i < imagem.altura; i++) {
+		free(imagem.matriz[i]) ;
+	}
+	
+	free(imagem.matriz) ;
+}
+
+// Retorna em im uma matriz de uma imagem, 
+// e retorna 1 caso a imagem não seja um PGM ou algo dê errado e 0 caso contrário
+unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) {
 	FILE *imagem ;
 	char tipo[3] ;
 	char comentarios ;
 	unsigned char pixel ;
 	int maxValor, i, j, x, y ;
-	struct imagem_t im ;
 	
 	// Inicializa a estrutura com valores padrão
-    im.matriz = NULL;
-    im.largura = 0;
-    im.altura = 0;
+    im->matriz = NULL;
+    im->largura = 0;
+    im->altura = 0;
 	
-	imagem = fopen(nomeDoArquivo, "r") ;
+	imagem = fopen(nomeDoArquivo, "rb") ;
 	if(!imagem) {
-		printf("Erro ao abrir a imagem\n") ; 
-		return im ;
+		perror("Erro ao abrir a imagem") ; 
+		return 1;
 	}
 	
 	// Leitura do cabeçalho
@@ -41,7 +52,7 @@ struct imagem_t criaMatrizDeImagem(char *nomeDoArquivo) {
 	// Como já leu um caractere, precisamos colocá-lo de volta no stream
 	ungetc(comentarios, imagem);
 	
-	fscanf(imagem, "%d %d", &(im.largura), &(im.altura)) ;
+	fscanf(imagem, "%d %d", &(im->largura), &(im->altura)) ;
 	fscanf(imagem, "%d", &maxValor) ;
 	
 	// Ignorar o caractere de nova linha que pode ficar no buffer
@@ -49,55 +60,57 @@ struct imagem_t criaMatrizDeImagem(char *nomeDoArquivo) {
 	
 	tipo[2] = '\0';
 	
-	// Imprime o cabeçalho
-	printf("%s\n", tipo) ;
-	printf("%d %d\n", im.largura, im.altura) ;
-	printf("%d\n", maxValor) ;
-	
 	// Aloca memória para um vetor de ponteiros (linhas)
-	im.matriz = (int **)malloc( (im.altura) * sizeof(int *) );
-	if(!(im.matriz)) {
+	im->matriz = (int **)malloc( (im->altura) * sizeof(int *) );
+	if(!(im->matriz)) {
 		printf("Erro ao alocar para matriz\n");
 		fclose(imagem);
-		return im;
+		return 1 ;
 	}
 	
 	// Aloca memória para cada linha na matriz
-	for (i = 0; i < (im.altura); i++) {
+	for (i = 0; i < (im->altura); i++) {
 		
-		im.matriz[i] = (int *)malloc( (im.largura) * sizeof(int));
+		im->matriz[i] = (int *)malloc( (im->largura) * sizeof(int));
 		
 		// Libera memória alocada caso de errado
-		if( !(im.matriz[i]) ) {
+		if( !(im->matriz[i]) ) {
 			for (j = 0; j < i; j++) {
-				free(im.matriz[j]);
+				free(im->matriz[j]);
 			}
-			free(im.matriz);
-			im.matriz = NULL;
+			free(im->matriz);
+			im->matriz = NULL;
 			fclose(imagem);
 			printf("Erro ao alocar para matriz\n");
 			
-			return im;
+			return 1 ;
 			
 		}
 	}
 	
 	// Leitura dos dados dos pixels
-	for (y = 0; y < (im.altura); y++) {
-		for (x = 0; x < (im.largura); x++) {
+	for (y = 0; y < (im->altura); y++) {
+		for (x = 0; x < (im->largura); x++) {
 			fread(&pixel, sizeof(unsigned char), 1, imagem);
 			// Armazenar como inteiro na matriz
-			im.matriz[y][x] = (int)pixel; 
+			im->matriz[y][x] = (int)pixel; 
+			// Verifica se o pixel é válido
+			if ((im->matriz[y][x] > maxValor) || (im->matriz[y][x] < 0)) {
+				liberaMatriz(*im) ;	
+				im->matriz = NULL ;	
+				fclose(imagem);
+				
+				return 1 ;
+			}
 		}
 	}
 
 	fclose(imagem);	
 	
-	return im;
+	return 0 ;
 }
 
-// Retorna a struct com matriz LBP da imagem
-struct imagem_t criaMatrizLBP(struct imagem_t imagem) {
+void criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 	// Contador de linhas e colunas na matriz imagem
 	int lin, col ;
 	// Contador de linhas e colunas da matriz bitmap
@@ -106,7 +119,6 @@ struct imagem_t criaMatrizLBP(struct imagem_t imagem) {
 	int soma;
 	int bitmap[3][3] ;
 	int pixel[3][3] ;
-	struct imagem_t LBP ;
 	
 	// Inicia a matriz mascara
 	int mascara[3][3] = {
@@ -116,47 +128,47 @@ struct imagem_t criaMatrizLBP(struct imagem_t imagem) {
 	} ;
 	
 	// Aloca memória para a matriz LBP 
-	LBP.matriz = (int **)malloc( (imagem.altura) * sizeof(int *) ) ;
-	if(!(LBP.matriz)) {
+	LBP->matriz = (int **)malloc( (imagem.altura) * sizeof(int *) ) ;
+	if(!(LBP->matriz)) {
 		printf("Erro ao alocar para matriz\n") ;
-		return LBP ;
+		return ;
 	}
 	
 	// Aloca memória para cada linha na matriz LBP
 	for (i = 0; i < (imagem.altura); i++) {
-		LBP.matriz[i] = (int *)malloc( (imagem.largura) * sizeof(int)) ;
+		LBP->matriz[i] = (int *)malloc( (imagem.largura) * sizeof(int)) ;
 		
 		// Libera memória alocada caso de errado
-		if( !(LBP.matriz[i]) ) {
+		if( !(LBP->matriz[i]) ) {
 			for (j = 0; j < i; j++) {
-				free(LBP.matriz[j]) ;
+				free(LBP->matriz[j]) ;
 			}
-			free(LBP.matriz) ;
-			LBP.matriz = NULL ;
+			free(LBP->matriz) ;
+			LBP->matriz = NULL ;
 			printf("Erro ao alocar para matriz\n") ;
 			
-			return LBP ;
+			return ;
 		}
 	}
 	
-	LBP.altura = imagem.altura ;
-	LBP.largura = imagem.largura ;
+	LBP->altura = imagem.altura ;
+	LBP->largura = imagem.largura ;
 	
 	// Copia a primeira linha para LBP
 	for (j = 0; j < imagem.largura; j++) {
-		LBP.matriz[0][j] = imagem.matriz[0][j] ; 
+		LBP->matriz[0][j] = imagem.matriz[0][j] ; 
 	}
 	// Copia a ultima linha para LBP
 	for (j = 0; j < imagem.largura; j++) {
-		LBP.matriz[imagem.altura-1][j] = imagem.matriz[imagem.altura-1][j] ; 
+		LBP->matriz[imagem.altura-1][j] = imagem.matriz[imagem.altura-1][j] ; 
 	}
 	// Copia a primeira coluna para LBP
 	for (i = 0; i < imagem.altura; i++) {
-		LBP.matriz[i][0] = imagem.matriz[i][0] ; 
+		LBP->matriz[i][0] = imagem.matriz[i][0] ; 
 	}
 	// Copia a ultima coluna para LBP
 	for (i = 0; i < imagem.altura; i++) {
-		LBP.matriz[i][imagem.largura-1] = imagem.matriz[i][imagem.largura-1] ; 
+		LBP->matriz[i][imagem.largura-1] = imagem.matriz[i][imagem.largura-1] ; 
 	}
 	
 	lin = 0 ;
@@ -195,19 +207,18 @@ struct imagem_t criaMatrizLBP(struct imagem_t imagem) {
 				}
 			}
 			
-			LBP.matriz[lin+1][col+1] = soma;	
+			LBP->matriz[lin+1][col+1] = soma;	
 				
 			col++ ; 
 		}
 		lin++ ;
 	}
-	
-	return LBP;
 }
 
 // Cria o vetor histograma da matriz LBP
-void criaHistograma(struct imagem_t LBP, int vetor[]) {
-	int i, j ;
+void criaHistograma(struct imagem_t LBP, float vetor[]) {
+	int i, j ; 
+	float magnitude ;
 	
 	// Preenche vetor com 0
 	for (i = 0; i < 256; i++) {
@@ -219,6 +230,16 @@ void criaHistograma(struct imagem_t LBP, int vetor[]) {
 			vetor[ LBP.matriz[i][j] ]++;
 		}
 	}
+	
+	magnitude = 0 ;
+	// Normaliza o vetor
+	for (i = 0; i < 256; i++) {
+		magnitude += vetor[i] ;
+	}
+	magnitude = sqrt(magnitude) ;
+	for (i = 0; i < 256; i++) {
+		vetor[i] /= magnitude ;	
+	}
 }
 
 // Cria uma imagem PGM a partir de uma matriz LBP
@@ -227,7 +248,7 @@ void criaImagemPGM(char *nomeDoArquivo, struct imagem_t LBP) {
 	int i, j;
 	unsigned char pixel;
     
-	arquivo = fopen(nomeDoArquivo, "w");
+	arquivo = fopen(nomeDoArquivo, "wb");
 	if (!arquivo) {
 		printf("Erro ao abrir a imagem\n");
 		return;
@@ -245,5 +266,6 @@ void criaImagemPGM(char *nomeDoArquivo, struct imagem_t LBP) {
 			fwrite(&pixel, sizeof(unsigned char), 1, arquivo);   // Escreve cada pixel
 		}
 	}
-
+	
+	fclose(arquivo);
 }

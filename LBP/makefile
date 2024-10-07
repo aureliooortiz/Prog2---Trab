@@ -1,11 +1,11 @@
 # Nome do arquivo de saída
-OUTPUT = programa
+OUTPUT = LBP
 
 # Compilador
 CC = gcc
 
 # Opções de compilação
-CFLAGS = -Wall -g -Wextra 
+CFLAGS = -Wall -g -Wextra
 
 # Lista de arquivos fonte
 SRCS = histograma.c main.c
@@ -15,14 +15,14 @@ OBJS = $(SRCS:.c=.o)
 
 # Comando para compilar
 $(OUTPUT): $(OBJS)
-	$(CC) $(CFLAGS) -o $(OUTPUT) $(OBJS)
+	$(CC) $(CFLAGS) -o $(OUTPUT) $(OBJS) -lm
 
 # Comando para limpar os arquivos gerados pela compilação
 clean:
 	rm -f $(OBJS) $(OUTPUT)
 
 # Dependências
-jogo.o: histograma.c histograma.h
+histograma.o: histograma.c histograma.h
 main.o: main.c histograma.h
 
 # Comando para executar o jogo
