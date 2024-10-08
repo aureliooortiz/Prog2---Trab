@@ -5,6 +5,8 @@ struct imagem_t {
 	int **matriz ;
 	int largura ;
 	int altura ;
+	int maxValor ;
+	char tipo[3] ;
 } ;
 
 void liberaMatriz(struct imagem_t imagem) ;

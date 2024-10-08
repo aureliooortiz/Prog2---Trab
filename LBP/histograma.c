@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <ctype.h>
 
@@ -7,6 +8,11 @@
 
 void liberaMatriz(struct imagem_t imagem) {
 	int i ;
+	
+	if (!imagem.matriz) {
+		printf("Imagem não inicializada\n") ;
+		return ;
+	}
 	
 	for (i = 0; i < imagem.altura; i++) {
 		free(imagem.matriz[i]) ;
@@ -19,24 +25,28 @@ void liberaMatriz(struct imagem_t imagem) {
 // e retorna 1 caso a imagem não seja um PGM ou algo dê errado e 0 caso contrário
 unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) {
 	FILE *imagem ;
-	char tipo[3] ;
 	char comentarios ;
 	unsigned char pixel ;
-	int maxValor, i, j, x, y ;
+	int pix, i, j, x, y ;
 	
-	// Inicializa a estrutura com valores padrão
-    im->matriz = NULL;
-    im->largura = 0;
-    im->altura = 0;
-	
-	imagem = fopen(nomeDoArquivo, "rb") ;
+	imagem = fopen(nomeDoArquivo, "r") ;
 	if(!imagem) {
-		perror("Erro ao abrir a imagem") ; 
-		return 1;
+		perror("Erro ao abrir o arquivo") ; 
+		return 1 ;
 	}
 	
 	// Leitura do cabeçalho
-	fscanf(imagem, "%2s", tipo) ;
+	if ((fscanf(imagem, "%2s", im->tipo)) != 1) {
+		printf("Tipo de arquivo não suportado\n") ;
+		fclose(imagem);
+		return 1 ;
+	}
+	im->tipo[2] = '\0';
+	if ((strcmp(im->tipo, "P2") != 0) && (strcmp(im->tipo, "P5") != 0)) {
+		printf("Tipo de arquivo não suportado\n") ;
+		fclose(imagem);
+		return 1 ;
+	}
 	
 	// Leitura dos comentários
 	do {
@@ -52,13 +62,30 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	// Como já leu um caractere, precisamos colocá-lo de volta no stream
 	ungetc(comentarios, imagem);
 	
-	fscanf(imagem, "%d %d", &(im->largura), &(im->altura)) ;
-	fscanf(imagem, "%d", &maxValor) ;
+	if ((fscanf(imagem, "%d %d", &(im->largura), &(im->altura))) != 2) {
+		printf("Tipo de arquivo não suportado\n") ;
+		fclose(imagem);
+		return 1;
+	}
+	if ((im->largura < 0) || (im->altura) < 0) {
+		printf("Tipo de arquivo não suportado\n") ;
+		fclose(imagem);
+		return 1 ;
+	}
+	
+	if ((fscanf(imagem, "%d", &(im->maxValor))) != 1) {
+		printf("Tipo de arquivo não suportado\n") ;
+		fclose(imagem);
+		return 1;
+	}	
+	if (im->maxValor < 0) {
+		printf("Tipo de arquivo não suportado\n") ;
+		fclose(imagem);
+		return 1 ;
+	}
 	
 	// Ignorar o caractere de nova linha que pode ficar no buffer
 	fgetc(imagem) ;	
-	
-	tipo[2] = '\0';
 	
 	// Aloca memória para um vetor de ponteiros (linhas)
 	im->matriz = (int **)malloc( (im->altura) * sizeof(int *) );
@@ -88,23 +115,43 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 		}
 	}
 	
-	// Leitura dos dados dos pixels
-	for (y = 0; y < (im->altura); y++) {
-		for (x = 0; x < (im->largura); x++) {
-			fread(&pixel, sizeof(unsigned char), 1, imagem);
-			// Armazenar como inteiro na matriz
-			im->matriz[y][x] = (int)pixel; 
-			// Verifica se o pixel é válido
-			if ((im->matriz[y][x] > maxValor) || (im->matriz[y][x] < 0)) {
-				liberaMatriz(*im) ;	
-				im->matriz = NULL ;	
-				fclose(imagem);
-				
-				return 1 ;
+	if (strcmp(im->tipo, "P2") == 0) {
+		// Leitura dos dados de arquivo P2
+		for (y = 0; y < (im->altura); y++) {
+			for (x = 0; x < (im->largura); x++) {
+				fscanf(imagem, "%d", &pix) ;
+				im->matriz[y][x] = pix ; 
+				// Verifica se o pixel é válido
+				if ((im->matriz[y][x] > im->maxValor) || (im->matriz[y][x] < 0)) {
+					printf("Tipo de arquivo não suportado\n") ;
+					liberaMatriz(*im) ;	
+					im->matriz = NULL ;	
+					fclose(imagem);
+					
+					return 1 ;
+				}
+			}
+		}
+	} else {
+		// Leitura dos dados dos pixels para P5
+		for (y = 0; y < (im->altura); y++) {
+			for (x = 0; x < (im->largura); x++) {
+				fread(&pixel, sizeof(unsigned char), 1, imagem) ;
+				// Armazenar como inteiro na matriz
+				im->matriz[y][x] = (int)pixel ; 
+				// Verifica se o pixel é válido
+				if ((im->matriz[y][x] > im->maxValor) || (im->matriz[y][x] < 0)) {
+					printf("Tipo de arquivo não suportado\n") ;
+					liberaMatriz(*im) ;	
+					im->matriz = NULL ;	
+					fclose(imagem) ;
+					
+					return 1 ;
+				}
 			}
 		}
 	}
-
+	
 	fclose(imagem);	
 	
 	return 0 ;
@@ -126,6 +173,11 @@ void criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 		{8, 0 , 16} ,
 		{32, 64, 128}
 	} ;
+	
+	if (!imagem.matriz) {
+		printf("Imagem não inicializada\n") ;
+		return ;
+	}
 	
 	// Aloca memória para a matriz LBP 
 	LBP->matriz = (int **)malloc( (imagem.altura) * sizeof(int *) ) ;
@@ -153,6 +205,8 @@ void criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 	
 	LBP->altura = imagem.altura ;
 	LBP->largura = imagem.largura ;
+	strcpy(LBP->tipo, imagem.tipo) ;
+	LBP->maxValor = imagem.maxValor ;
 	
 	// Copia a primeira linha para LBP
 	for (j = 0; j < imagem.largura; j++) {
@@ -220,6 +274,12 @@ void criaHistograma(struct imagem_t LBP, float vetor[]) {
 	int i, j ; 
 	float magnitude ;
 	
+	if (!LBP.matriz) {
+		printf("Imagem não inicializada\n") ;
+		return ;
+	}
+	
+	
 	// Preenche vetor com 0
 	for (i = 0; i < 256; i++) {
 		vetor[i] = 0 ;
@@ -245,27 +305,44 @@ void criaHistograma(struct imagem_t LBP, float vetor[]) {
 // Cria uma imagem PGM a partir de uma matriz LBP
 void criaImagemPGM(char *nomeDoArquivo, struct imagem_t LBP) {
 	FILE *arquivo;
-	int i, j;
+	int i, j, pix;
 	unsigned char pixel;
-    
+			
+	if (!LBP.matriz) {
+		printf("Imagem não inicializada\n") ;
+		return ;
+	}
+	
 	arquivo = fopen(nomeDoArquivo, "wb");
 	if (!arquivo) {
 		printf("Erro ao abrir a imagem\n");
 		return;
 	}
     
-	// Escreve o cabeçalho PGM (P5, largura, altura, valor máximo)
-	fprintf(arquivo, "P5\n");
+	// Escreve o cabeçalho PGM (P5 ou P2, largura, altura, valor máximo)
+	fprintf(arquivo, "%s\n", LBP.tipo);
 	fprintf(arquivo, "%d %d\n", LBP.largura, LBP.altura);
-	fprintf(arquivo, "255\n");  
+	fprintf(arquivo, "%d\n", LBP.maxValor);  
     
-	// Escreve os dados da matriz em formato binário
-	for (i = 0; i < LBP.altura; i++) {
-		for (j = 0; j < LBP.largura; j++) {
-			pixel = (unsigned char)LBP.matriz[i][j];  // Converte para byte
-			fwrite(&pixel, sizeof(unsigned char), 1, arquivo);   // Escreve cada pixel
+    if (strcmp(LBP.tipo, "P5") == 0) {
+		// Escreve os dados da matriz em formato binário
+		for (i = 0; i < LBP.altura; i++) {
+			for (j = 0; j < LBP.largura; j++) {
+				pixel = (unsigned char)LBP.matriz[i][j];  // Converte para byte
+				fwrite(&pixel, sizeof(unsigned char), 1, arquivo);   // Escreve cada pixel
+			}
+		}
+	} else {
+		for (i = 0; i < LBP.altura; i++) {
+			for (j = 0; j < LBP.largura; j++) {
+				pix = LBP.matriz[i][j] ; 
+				if (j == LBP.largura-1) {
+					fprintf(arquivo, "%d\n", pix) ;	
+				} else {
+					fprintf(arquivo, "%d ", pix) ;   
+				}	
+			}
 		}
 	}
-	
 	fclose(arquivo);
 }

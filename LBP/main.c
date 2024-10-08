@@ -118,35 +118,39 @@ int main(int argc, char *argv[]) {
 	}
 	
 	criaMatrizLBP(imagem, &LBP) ;
-	criaHistograma(LBP, histograma1) ;
 	
 	if (caso1) {
 		criaImagemPGM(saidaImagem, LBP) ;
 		free(saidaImagem) ;
 	} else {
 		i = 0 ;
+		criaHistograma(LBP, histograma1) ;
 		while ((entrada = readdir(dir)) != NULL) {
 			if ((entrada->d_type == DT_REG)) {	
-				// Verifica se a imagem é do tipo PGM, caso não 'continue'
-			
+				
 				n = strlen (entrada->d_name) ;
 				j = strlen (nomeDiretorio) ;
-				// Cria uma nova string com espaço pra concatenar ambas
+				// Concatena nome do arquivo e do diretorio para ser possivel abrir
 				concat = (char*)malloc((n+j+1)) ;
 				strcpy(concat, nomeDiretorio) ;
 				strcat(concat, entrada->d_name) ;
 				concat[n+j] = '\0' ;
+				
 				erro = criaMatrizDeImagem(concat, &imagemDiretorio) ; 
 				if (erro) {
 					contVet-- ;
+					free(concat) ;
+					
 					continue ;
 				}
 				criaMatrizLBP(imagemDiretorio, &LBP1) ;
 				criaHistograma(LBP1, diretorio[i].histograma) ;
 				strcpy(diretorio[i].nome, entrada->d_name) ;
 				diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
+				
 				liberaMatriz(imagemDiretorio) ;
 				liberaMatriz(LBP1) ;
+				free(concat) ;	
 				i++ ;
 			}	
 		}
@@ -158,12 +162,10 @@ int main(int argc, char *argv[]) {
 		}
 		printf("Imagem mais similar: %s %.6f\n", diretorio[menor].nome, diretorio[menor].distancia) ;
 		
-		free(concat) ;
 		free(nomeDiretorio) ;
 		free(diretorio) ;
 		closedir(dir) ;
 	}
-	
 	free(nomeImagem) ;
 	liberaMatriz(imagem) ;
 	liberaMatriz(LBP) ;
