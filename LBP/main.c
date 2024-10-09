@@ -8,6 +8,7 @@
 
 // struct auxiliar para guardar nome e a posição no vetor distancias da imagem
 struct imagensDiretorio {
+	// Um arquivo tem no máximo 255 caracteres
 	char nome[256] ;
 	float histograma[256] ;
 	float distancia ;
@@ -117,41 +118,63 @@ int main(int argc, char *argv[]) {
 		return 1 ; 
 	}
 	
-	criaMatrizLBP(imagem, &LBP) ;
+	if (!(criaMatrizLBP(imagem, &LBP))) {
+		printf("Erro ao criar matriz de LBP\n") ;
+		return 1 ;
+	}
 	
 	if (caso1) {
-		criaImagemPGM(saidaImagem, LBP) ;
+		if (!(criaImagemPGM(saidaImagem, LBP) )) {
+			printf("Erro ao criar arquivo PGM\n") ;
+			return 1 ;
+		}
 		free(saidaImagem) ;
 	} else {
 		i = 0 ;
-		criaHistograma(LBP, histograma1) ;
+		//if (!(procuraVetorHistograma(nomeImagem))) {
+			if ((criaHistograma(LBP, histograma1, nomeImagem, nomeDiretorio)) == -1) {
+				printf("Erro ao criar histograma1\n") ;
+				return 1 ;
+			}
+		//}	
 		while ((entrada = readdir(dir)) != NULL) {
 			if ((entrada->d_type == DT_REG)) {	
-				
-				n = strlen (entrada->d_name) ;
-				j = strlen (nomeDiretorio) ;
-				// Concatena nome do arquivo e do diretorio para ser possivel abrir
-				concat = (char*)malloc((n+j+1)) ;
-				strcpy(concat, nomeDiretorio) ;
-				strcat(concat, entrada->d_name) ;
-				concat[n+j] = '\0' ;
-				
-				erro = criaMatrizDeImagem(concat, &imagemDiretorio) ; 
-				if (erro) {
-					contVet-- ;
-					free(concat) ;
+				// Verifica se o vetor histograma já existe
+				//if (!(procuraVetorHistograma(entrada->d_name))) {	
+					n = strlen (entrada->d_name) ;
+					j = strlen (nomeDiretorio) ;
+					// Concatena nome do arquivo e do diretorio para ser possivel abrir
+					concat = (char*)malloc((n+j+1)) ;
+					strcpy(concat, nomeDiretorio) ;
+					strcat(concat, entrada->d_name) ;
+					concat[n+j] = '\0' ;
 					
-					continue ;
-				}
-				criaMatrizLBP(imagemDiretorio, &LBP1) ;
-				criaHistograma(LBP1, diretorio[i].histograma) ;
-				strcpy(diretorio[i].nome, entrada->d_name) ;
-				diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
+					erro = criaMatrizDeImagem(concat, &imagemDiretorio) ; 
+					if (erro) {
+						contVet-- ;
+						free(concat) ;
+						
+						continue ;
+					}
+					strcpy(diretorio[i].nome, entrada->d_name) ;
+					if(!(criaMatrizLBP(imagemDiretorio, &LBP1))) {
+						printf("Erro ao criar matriz LBP\n") ;
+						return 1 ;
+					}
+					if(!(criaHistograma(LBP1, diretorio[i].histograma, 
+							diretorio[i].nome, nomeDiretorio))) {
+						printf("Erro ao criar histograma2\n") ;
+						return 1 ;
+					}
+					diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
+					
+					liberaMatriz(imagemDiretorio) ;
+					liberaMatriz(LBP1) ;
+					free(concat) ;	
+					i++ ;
+				//} else {
 				
-				liberaMatriz(imagemDiretorio) ;
-				liberaMatriz(LBP1) ;
-				free(concat) ;	
-				i++ ;
+				//}	
 			}	
 		}
 		menor = 0;

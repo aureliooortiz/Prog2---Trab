@@ -38,13 +38,13 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	// Leitura do cabeçalho
 	if ((fscanf(imagem, "%2s", im->tipo)) != 1) {
 		printf("Tipo de arquivo não suportado\n") ;
-		fclose(imagem);
+		fclose(imagem) ;
 		return 1 ;
 	}
 	im->tipo[2] = '\0';
 	if ((strcmp(im->tipo, "P2") != 0) && (strcmp(im->tipo, "P5") != 0)) {
 		printf("Tipo de arquivo não suportado\n") ;
-		fclose(imagem);
+		fclose(imagem) ;
 		return 1 ;
 	}
 	
@@ -54,13 +54,13 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 		// Se encontrar um comentário, ignora a linha inteira
 		if (comentarios == '#') {
 			// Pular até o fim da linha
-			while (fgetc(imagem) != '\n');  
+			while (fgetc(imagem) != '\n') ;  
 		}
 	// Continua ignorando até encontrar algo que não seja espaço ou comentário	
-	} while (comentarios == '#' || isspace(comentarios));  
+	} while (comentarios == '#' || isspace(comentarios)) ;  
 
 	// Como já leu um caractere, precisamos colocá-lo de volta no stream
-	ungetc(comentarios, imagem);
+	ungetc(comentarios, imagem) ;
 	
 	if ((fscanf(imagem, "%d %d", &(im->largura), &(im->altura))) != 2) {
 		printf("Tipo de arquivo não suportado\n") ;
@@ -88,27 +88,27 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	fgetc(imagem) ;	
 	
 	// Aloca memória para um vetor de ponteiros (linhas)
-	im->matriz = (int **)malloc( (im->altura) * sizeof(int *) );
+	im->matriz = (int **)malloc( (im->altura) * sizeof(int *) ) ;
 	if(!(im->matriz)) {
-		printf("Erro ao alocar para matriz\n");
-		fclose(imagem);
+		printf("Erro ao alocar para matriz\n") ;
+		fclose(imagem) ;
 		return 1 ;
 	}
 	
 	// Aloca memória para cada linha na matriz
 	for (i = 0; i < (im->altura); i++) {
 		
-		im->matriz[i] = (int *)malloc( (im->largura) * sizeof(int));
+		im->matriz[i] = (int *)malloc( (im->largura) * sizeof(int)) ;
 		
 		// Libera memória alocada caso de errado
 		if( !(im->matriz[i]) ) {
 			for (j = 0; j < i; j++) {
-				free(im->matriz[j]);
+				free(im->matriz[j]) ;
 			}
-			free(im->matriz);
-			im->matriz = NULL;
-			fclose(imagem);
-			printf("Erro ao alocar para matriz\n");
+			free(im->matriz) ;
+			im->matriz = NULL ;
+			fclose(imagem) ;
+			printf("Erro ao alocar para matriz\n") ;
 			
 			return 1 ;
 			
@@ -126,7 +126,7 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 					printf("Tipo de arquivo não suportado\n") ;
 					liberaMatriz(*im) ;	
 					im->matriz = NULL ;	
-					fclose(imagem);
+					fclose(imagem) ;
 					
 					return 1 ;
 				}
@@ -157,7 +157,7 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	return 0 ;
 }
 
-void criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
+unsigned short int criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 	// Contador de linhas e colunas na matriz imagem
 	int lin, col ;
 	// Contador de linhas e colunas da matriz bitmap
@@ -174,16 +174,18 @@ void criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 		{32, 64, 128}
 	} ;
 	
+	// O cálculo do LBP só funciona para imagens que 
+	// tenham até 256 níveis de cinza cada pixel
 	if (!imagem.matriz) {
 		printf("Imagem não inicializada\n") ;
-		return ;
+		return 0 ;
 	}
 	
 	// Aloca memória para a matriz LBP 
 	LBP->matriz = (int **)malloc( (imagem.altura) * sizeof(int *) ) ;
 	if(!(LBP->matriz)) {
 		printf("Erro ao alocar para matriz\n") ;
-		return ;
+		return 0 ;
 	}
 	
 	// Aloca memória para cada linha na matriz LBP
@@ -199,7 +201,7 @@ void criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 			LBP->matriz = NULL ;
 			printf("Erro ao alocar para matriz\n") ;
 			
-			return ;
+			return 0 ;
 		}
 	}
 	
@@ -267,18 +269,22 @@ void criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 		}
 		lin++ ;
 	}
+	
+	return 1 ;
 }
 
-// Cria o vetor histograma da matriz LBP
-void criaHistograma(struct imagem_t LBP, float vetor[]) {
-	int i, j ; 
+// Cria o vetor histograma da matriz LBP, e salva em um arquivo
+short int criaHistograma(struct imagem_t LBP, float vetor[], char *nomeImagem, 
+									char *nomeDiretorio) {
+	int i, j ;
 	float magnitude ;
+	char *nomeRedefinido, *busca ;
+	FILE *arq ;
 	
 	if (!LBP.matriz) {
 		printf("Imagem não inicializada\n") ;
-		return ;
+		return -1 ;
 	}
-	
 	
 	// Preenche vetor com 0
 	for (i = 0; i < 256; i++) {
@@ -300,36 +306,78 @@ void criaHistograma(struct imagem_t LBP, float vetor[]) {
 	for (i = 0; i < 256; i++) {
 		vetor[i] /= magnitude ;	
 	}
+	
+	// Mantem apenas o nome da imagem e 
+	// não seu caminho caso o nome seja o caminho
+	busca = strstr(nomeImagem, nomeDiretorio) ;
+	if (busca != NULL) {
+		busca += strlen(nomeDiretorio) ;
+		strcpy(nomeImagem, busca) ;	
+	}
+		
+	nomeRedefinido = (char*)malloc(strlen(nomeImagem)) ;
+	
+	// Procura a extensão da imagem se existir e substitui por lbp
+	strcpy(nomeRedefinido, nomeImagem) ;
+	busca = strrchr(nomeRedefinido, '.') ;
+	if (!busca) { 	
+		printf("Imagem sem extensão\n") ;
+		//printf("%s\n", nomeRedefinido);
+		return 0 ;
+	} 
+	// Verifica se tenho espaço para adicionar a extensão
+	if ((sizeof(nomeRedefinido) - (busca - nomeRedefinido) - 1) < 4) {
+		printf("Sem espaço para adicionar extensão\n") ;
+		printf("%s\n", nomeRedefinido);
+		return 0 ;
+	}
+	strcpy(busca+1, "lbp") ;
+	
+	// Cria arquivo binário no diretorio atual e armazena o vetor
+	arq = fopen(nomeRedefinido, "wb") ;
+	if (!arq) {
+		printf("Erro ao abrir arquivo\n") ;
+		return 0 ;
+	}
+	for (i = 0; i < 256; i++) {
+		fwrite(&(vetor[i]), sizeof(float), 1, arq) ;
+	}		
+	
+	free(nomeRedefinido) ;
+	fclose(arq);
+	
+	return 1 ;
 }
 
 // Cria uma imagem PGM a partir de uma matriz LBP
-void criaImagemPGM(char *nomeDoArquivo, struct imagem_t LBP) {
-	FILE *arquivo;
-	int i, j, pix;
-	unsigned char pixel;
+unsigned short int criaImagemPGM(char *nomeDoArquivo, struct imagem_t LBP) {
+	FILE *arquivo ;
+	int i, j, pix ;
+	unsigned char pixel; 
 			
 	if (!LBP.matriz) {
 		printf("Imagem não inicializada\n") ;
-		return ;
+		return 0 ;
 	}
 	
-	arquivo = fopen(nomeDoArquivo, "wb");
+	// Não sobreescreve o arquivo caso ele exista e retorna
+	arquivo = fopen(nomeDoArquivo, "wx") ;
 	if (!arquivo) {
-		printf("Erro ao abrir a imagem\n");
-		return;
+		printf("Erro ao abrir a imagem\n") ;
+		return 0 ;
 	}
     
 	// Escreve o cabeçalho PGM (P5 ou P2, largura, altura, valor máximo)
-	fprintf(arquivo, "%s\n", LBP.tipo);
-	fprintf(arquivo, "%d %d\n", LBP.largura, LBP.altura);
-	fprintf(arquivo, "%d\n", LBP.maxValor);  
+	fprintf(arquivo, "%s\n", LBP.tipo) ;
+	fprintf(arquivo, "%d %d\n", LBP.largura, LBP.altura) ;
+	fprintf(arquivo, "%d\n", LBP.maxValor) ;  
     
     if (strcmp(LBP.tipo, "P5") == 0) {
 		// Escreve os dados da matriz em formato binário
 		for (i = 0; i < LBP.altura; i++) {
 			for (j = 0; j < LBP.largura; j++) {
-				pixel = (unsigned char)LBP.matriz[i][j];  // Converte para byte
-				fwrite(&pixel, sizeof(unsigned char), 1, arquivo);   // Escreve cada pixel
+				pixel = (unsigned char)LBP.matriz[i][j];  
+				fwrite(&pixel, sizeof(unsigned char), 1, arquivo);   
 			}
 		}
 	} else {
@@ -344,5 +392,7 @@ void criaImagemPGM(char *nomeDoArquivo, struct imagem_t LBP) {
 			}
 		}
 	}
-	fclose(arquivo);
+	fclose(arquivo) ;
+	
+	return 1 ;
 }
