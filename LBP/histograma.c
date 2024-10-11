@@ -20,6 +20,8 @@ void liberaMatriz(struct imagem_t imagem) {
 	}
 	
 	free(imagem.matriz) ;
+	
+	return ;
 }
 
 // Retorna em im uma matriz de uma imagem, 
@@ -32,7 +34,7 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	
 	imagem = fopen(nomeDoArquivo, "rb") ;
 	if(!imagem) {
-		perror("Erro ao abrir o arquivo") ; 
+		printf("Erro ao abrir o arquivo") ; 
 		return 1 ;
 	}
 	
@@ -126,7 +128,7 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 				if ((im->matriz[y][x] > im->maxValor) || (im->matriz[y][x] < 0)) {
 					printf("Tipo de arquivo não suportado\n") ;
 					liberaMatriz(*im) ;	
-					im->matriz = NULL ;	
+					im->matriz = NULL ;
 					fclose(imagem) ;
 					
 					return 1 ;
