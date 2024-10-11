@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <dirent.h>
 #include <ctype.h>
 
 #include "histograma.h"
@@ -29,7 +30,7 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	unsigned char pixel ;
 	int pix, i, j, x, y ;
 	
-	imagem = fopen(nomeDoArquivo, "r") ;
+	imagem = fopen(nomeDoArquivo, "rb") ;
 	if(!imagem) {
 		perror("Erro ao abrir o arquivo") ; 
 		return 1 ;
@@ -37,13 +38,13 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	
 	// Leitura do cabeçalho
 	if ((fscanf(imagem, "%2s", im->tipo)) != 1) {
-		printf("Tipo de arquivo não suportado\n") ;
+		printf("Tipo de arquivo não suportado-1\n") ;
 		fclose(imagem) ;
 		return 1 ;
 	}
 	im->tipo[2] = '\0';
 	if ((strcmp(im->tipo, "P2") != 0) && (strcmp(im->tipo, "P5") != 0)) {
-		printf("Tipo de arquivo não suportado\n") ;
+		printf("Tipo de arquivo não suportado0\n") ;
 		fclose(imagem) ;
 		return 1 ;
 	}
@@ -63,23 +64,23 @@ unsigned short int criaMatrizDeImagem(char *nomeDoArquivo, struct imagem_t *im) 
 	ungetc(comentarios, imagem) ;
 	
 	if ((fscanf(imagem, "%d %d", &(im->largura), &(im->altura))) != 2) {
-		printf("Tipo de arquivo não suportado\n") ;
+		printf("Tipo de arquivo não suportado1\n") ;
 		fclose(imagem);
 		return 1;
 	}
 	if ((im->largura < 0) || (im->altura) < 0) {
-		printf("Tipo de arquivo não suportado\n") ;
+		printf("Tipo de arquivo não suportado2\n") ;
 		fclose(imagem);
 		return 1 ;
 	}
 	
 	if ((fscanf(imagem, "%d", &(im->maxValor))) != 1) {
-		printf("Tipo de arquivo não suportado\n") ;
+		printf("Tipo de arquivo não suportado3\n") ;
 		fclose(imagem);
 		return 1;
 	}	
 	if (im->maxValor < 0) {
-		printf("Tipo de arquivo não suportado\n") ;
+		printf("Tipo de arquivo não suportado4\n") ;
 		fclose(imagem);
 		return 1 ;
 	}
@@ -273,17 +274,141 @@ unsigned short int criaMatrizLBP(struct imagem_t imagem, struct imagem_t *LBP) {
 	return 1 ;
 }
 
+// Normaliza o nome para imagem.lbp
+char *normalizaNome(const char *nomeImagem, const char *nomeDiretorio) {
+    char *busca, *nomeNormalizado;
+    int nomeLen, extensaoLen;
+
+    // Aloca uma nova string para armazenar o nome normalizado
+    nomeNormalizado = (char*)malloc(strlen(nomeImagem) + 5); 
+    if (nomeNormalizado == NULL) {
+        printf("Falha na alocação de memória.\n");
+        return NULL;
+    }
+
+    strcpy(nomeNormalizado, nomeImagem);
+
+    // Mantem apenas o nome da imagem e não o caminho, caso o nome seja o caminho
+    busca = strstr(nomeNormalizado, nomeDiretorio);
+    if (busca != NULL) {
+        busca += strlen(nomeDiretorio);
+        memmove(nomeNormalizado, busca, strlen(busca) + 1);  
+    }
+
+    // Verifica a extensão da imagem
+    busca = strrchr(nomeNormalizado, '.');
+    if (!busca) {
+        printf("Imagem sem extensão\n");
+        free(nomeNormalizado);  
+        return NULL;
+    }
+
+	// Verifica se a string completa, incluindo a nova extensão, excede 255 caracteres
+    nomeLen = strlen(nomeNormalizado);
+    extensaoLen = strlen(busca);
+    if (nomeLen - extensaoLen + 4 > 255) {
+        printf("Sem espaço para adicionar extensão\n");
+        free(nomeNormalizado);  
+        return NULL;
+    }
+
+    strcpy(busca + 1, "lbp");
+
+    return nomeNormalizado;
+}
+
+// Lê o arquivo e armazena seus valores em vet
+void leVetorLBP(char *nomeImagem, char *nomeDiretorio, float vet[]) {
+	char *nomeNormalizado ;	
+	FILE *arq ;
+	
+	nomeNormalizado = normalizaNome(nomeImagem, nomeDiretorio) ;
+	
+	// Coloca os valores do arquivo em um vetor
+	arq = fopen(nomeNormalizado, "rb") ;
+	if (!arq) {
+		printf("Erro ao abrir arquivo\n") ;
+		return ;
+	}
+	fread(vet, sizeof(float), 256, arq) ;
+	
+	if (nomeNormalizado != NULL) {
+		free(nomeNormalizado) ;
+	}
+	fclose(arq) ;
+
+}
+
+// Procura no diretorio atual o arquivo .lbp, retorna 1 se existe e 0 caso não
+// e retorna -1 em caso de erro
+unsigned short int procuraVetorHistograma(char *nomeImagem, char *nomeDiretorio) {
+	char *nomeNormalizado ;
+	struct dirent *entrada ;
+	DIR *dir ;	
+		
+	nomeNormalizado = normalizaNome(nomeImagem, nomeDiretorio) ;
+	
+	dir = opendir(".") ;
+	if (!dir) { 
+		printf ("Erro ao abrir diretório\n") ;
+		return -1 ;
+	}
+	
+	// Percorre o diretório procurando um arquivo com o nomeDaImagem.lbp
+	while ((entrada = readdir(dir)) != NULL ) {
+		if ((entrada->d_type == DT_REG)) {
+			if ((strcmp(entrada->d_name, nomeNormalizado)) == 0) {
+				if (nomeNormalizado != NULL) {
+					free(nomeNormalizado) ;
+				}	
+				closedir(dir) ;	
+				
+				return 1 ;
+			}
+		}
+	}
+	
+	if (nomeNormalizado != NULL) {
+		free(nomeNormalizado) ;
+	}	
+	closedir(dir) ;
+	
+	return 0 ;
+}
+
+// Cria um arquivo no diretório atual contendo o vetor histograma da imagem
+void armazenaVetor(float vetor[], char *nomeImagem, char *nomeDiretorio) {
+	char *nomeNormalizado ;
+	FILE *arq ;
+	
+	nomeNormalizado = normalizaNome(nomeImagem, nomeDiretorio) ;
+	
+	if (!nomeNormalizado) {
+		printf("Erro ao normalizar nome\n") ;
+		return ;
+	}
+	
+	// Cria arquivo binário no diretorio atual e armazena o vetor
+	arq = fopen(nomeNormalizado, "wb") ;
+	if (!arq) {
+		printf("Erro ao abrir arquivo\n") ;
+		return ;
+	}
+
+	fwrite(vetor, sizeof(float), 256, arq) ;
+	
+	free(nomeNormalizado) ;		
+	fclose(arq);	
+}
+
 // Cria o vetor histograma da matriz LBP, e salva em um arquivo
-short int criaHistograma(struct imagem_t LBP, float vetor[], char *nomeImagem, 
-									char *nomeDiretorio) {
+unsigned short int criaHistograma(struct imagem_t LBP, float vetor[]) {
 	int i, j ;
 	float magnitude ;
-	char *nomeRedefinido, *busca ;
-	FILE *arq ;
 	
 	if (!LBP.matriz) {
 		printf("Imagem não inicializada\n") ;
-		return -1 ;
+		return 0 ;
 	}
 	
 	// Preenche vetor com 0
@@ -306,45 +431,6 @@ short int criaHistograma(struct imagem_t LBP, float vetor[], char *nomeImagem,
 	for (i = 0; i < 256; i++) {
 		vetor[i] /= magnitude ;	
 	}
-	
-	// Mantem apenas o nome da imagem e 
-	// não seu caminho caso o nome seja o caminho
-	busca = strstr(nomeImagem, nomeDiretorio) ;
-	if (busca != NULL) {
-		busca += strlen(nomeDiretorio) ;
-		strcpy(nomeImagem, busca) ;	
-	}
-		
-	nomeRedefinido = (char*)malloc(strlen(nomeImagem)) ;
-	
-	// Procura a extensão da imagem se existir e substitui por lbp
-	strcpy(nomeRedefinido, nomeImagem) ;
-	busca = strrchr(nomeRedefinido, '.') ;
-	if (!busca) { 	
-		printf("Imagem sem extensão\n") ;
-		//printf("%s\n", nomeRedefinido);
-		return 0 ;
-	} 
-	// Verifica se tenho espaço para adicionar a extensão
-	if ((sizeof(nomeRedefinido) - (busca - nomeRedefinido) - 1) < 4) {
-		printf("Sem espaço para adicionar extensão\n") ;
-		printf("%s\n", nomeRedefinido);
-		return 0 ;
-	}
-	strcpy(busca+1, "lbp") ;
-	
-	// Cria arquivo binário no diretorio atual e armazena o vetor
-	arq = fopen(nomeRedefinido, "wb") ;
-	if (!arq) {
-		printf("Erro ao abrir arquivo\n") ;
-		return 0 ;
-	}
-	for (i = 0; i < 256; i++) {
-		fwrite(&(vetor[i]), sizeof(float), 1, arq) ;
-	}		
-	
-	free(nomeRedefinido) ;
-	fclose(arq);
 	
 	return 1 ;
 }

@@ -44,6 +44,9 @@ int main(int argc, char *argv[]) {
 		return 1 ;
 	}
 	
+	// Condicionais no if que retornam verificar variaveis nulas para 
+	// poder liberar memoria, inicia-las como nulas
+	
 	contI = 0 ;
 	contO = 0 ;
 	contD = 0 ;
@@ -111,10 +114,17 @@ int main(int argc, char *argv[]) {
 		}
 		i += 2 ;
 	}
+	
+	// Verificar variaveis nulas para saber o que liberar memória
 		
 	erro = criaMatrizDeImagem(nomeImagem, &imagem) ;
 	if (erro) {
 		printf("Erro ao criar matriz de imagem\n") ;
+		free(nomeImagem) ;
+		free(nomeDiretorio) ;
+		free(diretorio) ;
+		closedir(dir) ;
+		
 		return 1 ; 
 	}
 	
@@ -131,26 +141,30 @@ int main(int argc, char *argv[]) {
 		free(saidaImagem) ;
 	} else {
 		i = 0 ;
-		//if (!(procuraVetorHistograma(nomeImagem))) {
-			if ((criaHistograma(LBP, histograma1, nomeImagem, nomeDiretorio)) == -1) {
+		if (!(procuraVetorHistograma(nomeImagem, nomeDiretorio))) {
+			if (!(criaHistograma(LBP, histograma1))) {
 				printf("Erro ao criar histograma1\n") ;
 				return 1 ;
 			}
-		//}	
+			armazenaVetor(histograma1, nomeImagem, nomeDiretorio) ;
+		} else {
+			leVetorLBP(nomeImagem, nomeDiretorio, histograma1) ;
+		}	
 		while ((entrada = readdir(dir)) != NULL) {
 			if ((entrada->d_type == DT_REG)) {	
 				// Verifica se o vetor histograma já existe
-				//if (!(procuraVetorHistograma(entrada->d_name))) {	
+				if (!(procuraVetorHistograma(entrada->d_name, nomeDiretorio))) {	
 					n = strlen (entrada->d_name) ;
 					j = strlen (nomeDiretorio) ;
 					// Concatena nome do arquivo e do diretorio para ser possivel abrir
 					concat = (char*)malloc((n+j+1)) ;
+					concat[n+j] = '\0' ;
 					strcpy(concat, nomeDiretorio) ;
 					strcat(concat, entrada->d_name) ;
-					concat[n+j] = '\0' ;
 					
 					erro = criaMatrizDeImagem(concat, &imagemDiretorio) ; 
 					if (erro) {
+						printf("\nEntrou\n");
 						contVet-- ;
 						free(concat) ;
 						
@@ -161,20 +175,23 @@ int main(int argc, char *argv[]) {
 						printf("Erro ao criar matriz LBP\n") ;
 						return 1 ;
 					}
-					if(!(criaHistograma(LBP1, diretorio[i].histograma, 
-							diretorio[i].nome, nomeDiretorio))) {
+					if(!(criaHistograma(LBP1, diretorio[i].histograma))) {
 						printf("Erro ao criar histograma2\n") ;
 						return 1 ;
 					}
+					armazenaVetor(diretorio[i].histograma, entrada->d_name, nomeDiretorio) ;
 					diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
 					
 					liberaMatriz(imagemDiretorio) ;
 					liberaMatriz(LBP1) ;
 					free(concat) ;	
 					i++ ;
-				//} else {
-				
-				//}	
+				} else {
+					strcpy(diretorio[i].nome, entrada->d_name) ;
+					leVetorLBP(entrada->d_name, nomeDiretorio, diretorio[i].histograma) ;
+					diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
+					i++ ;
+				}
 			}	
 		}
 		menor = 0;
