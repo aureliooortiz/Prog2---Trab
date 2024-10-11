@@ -318,7 +318,7 @@ char *normalizaNome(const char *nomeImagem, const char *nomeDiretorio) {
 }
 
 // Lê o arquivo e armazena seus valores em vet
-void leVetorLBP(char *nomeImagem, char *nomeDiretorio, float vet[]) {
+unsigned short int leVetorLBP(char *nomeImagem, char *nomeDiretorio, float vet[]) {
 	char *nomeNormalizado ;	
 	FILE *arq ;
 	
@@ -328,7 +328,7 @@ void leVetorLBP(char *nomeImagem, char *nomeDiretorio, float vet[]) {
 	arq = fopen(nomeNormalizado, "rb") ;
 	if (!arq) {
 		printf("Erro ao abrir arquivo\n") ;
-		return ;
+		return 0 ;
 	}
 	fread(vet, sizeof(float), 256, arq) ;
 	
@@ -337,6 +337,7 @@ void leVetorLBP(char *nomeImagem, char *nomeDiretorio, float vet[]) {
 	}
 	fclose(arq) ;
 
+	return 1 ;
 }
 
 // Procura no diretorio atual o arquivo .lbp, retorna 1 se existe e 0 caso não
@@ -377,7 +378,7 @@ unsigned short int procuraVetorHistograma(char *nomeImagem, char *nomeDiretorio)
 }
 
 // Cria um arquivo no diretório atual contendo o vetor histograma da imagem
-void armazenaVetor(float vetor[], char *nomeImagem, char *nomeDiretorio) {
+unsigned short int armazenaVetor(float vetor[], char *nomeImagem, char *nomeDiretorio) {
 	char *nomeNormalizado ;
 	FILE *arq ;
 	
@@ -385,20 +386,22 @@ void armazenaVetor(float vetor[], char *nomeImagem, char *nomeDiretorio) {
 	
 	if (!nomeNormalizado) {
 		printf("Erro ao normalizar nome\n") ;
-		return ;
+		return 0 ;
 	}
 	
 	// Cria arquivo binário no diretorio atual e armazena o vetor
 	arq = fopen(nomeNormalizado, "wb") ;
 	if (!arq) {
 		printf("Erro ao abrir arquivo\n") ;
-		return ;
+		return 0 ;
 	}
 
 	fwrite(vetor, sizeof(float), 256, arq) ;
 	
 	free(nomeNormalizado) ;		
-	fclose(arq);	
+	fclose(arq);
+	
+	return 1 ;	
 }
 
 // Cria o vetor histograma da matriz LBP, e salva em um arquivo

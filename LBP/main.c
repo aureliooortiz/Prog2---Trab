@@ -33,7 +33,8 @@ int main(int argc, char *argv[]) {
 	struct dirent *entrada ;
 	struct imagensDiretorio *diretorio ;
 	DIR *dir ;
-	unsigned short int contI, contO, contD, caso1, erro, o, d, libera ;
+	short int erro ;
+	unsigned short int contI, contO, contD, caso1, o, d, libera ;
 	float histograma1[256] ; 
 	long n, contVet, i, j, menor ;
 	char *nomeImagem, *saidaImagem, *nomeDiretorio, *concat ;
@@ -58,6 +59,7 @@ int main(int argc, char *argv[]) {
 	// Diz se as matrizes foram alocadas dinamicamente
 	libera = 0 ;
 	i = 1 ;
+	erro = -3 ;
 	// Impede que chamemos usemos as flags -d e -o juntos
 	d = 0 ;
 	o = 0 ;
@@ -275,14 +277,37 @@ int main(int argc, char *argv[]) {
 				return 1 ;
 			}
 			// Verificar erros de armazenaVetor e leVetorLBP
-			armazenaVetor(histograma1, nomeImagem, nomeDiretorio) ;
+			if (!(armazenaVetor(histograma1, nomeImagem, nomeDiretorio))) {
+				printf("Erro ao armazenar vetor\n") ;
+				free(nomeImagem) ;
+				liberaMatriz(imagem) ;
+				liberaMatriz(LBP) ;
+				free(nomeDiretorio) ;
+				free(diretorio) ;
+				closedir(dir) ;
+				
+				return 1 ;
+			}
 		} else {
-			leVetorLBP(nomeImagem, nomeDiretorio, histograma1) ;
+			if(!(leVetorLBP(nomeImagem, nomeDiretorio, histograma1))) {
+				printf("Erro ao ler vetor do arquivo\n") ;
+				free(nomeImagem) ;
+				if (libera) {	
+					liberaMatriz(imagem) ;
+					liberaMatriz(LBP) ;
+				}	
+				free(nomeDiretorio) ;
+				free(diretorio) ;
+				closedir(dir) ;
+				
+				return 1 ;
+			}
 		}	
 		while ((entrada = readdir(dir)) != NULL) {
 			if ((entrada->d_type == DT_REG)) {	
+				erro = (procuraVetorHistograma(entrada->d_name, nomeDiretorio)) ;
 				// Verifica se o vetor histograma já existe
-				if (!(procuraVetorHistograma(entrada->d_name, nomeDiretorio))) {	
+				if (!erro) {	
 					n = strlen (entrada->d_name) ;
 					j = strlen (nomeDiretorio) ;
 					// Concatena nome do arquivo e do diretorio para ser possivel abrir
@@ -308,6 +333,7 @@ int main(int argc, char *argv[]) {
 						}	
 						free(nomeDiretorio) ;
 						free(diretorio) ;
+						liberaMatriz(imagemDiretorio) ; 
 						closedir(dir) ;
 					
 						return 1 ;
@@ -321,17 +347,44 @@ int main(int argc, char *argv[]) {
 						}	
 						free(nomeDiretorio) ;
 						free(diretorio) ;
+						liberaMatriz(imagemDiretorio) ; 
+						liberaMatriz(LBP1) ;
 						closedir(dir) ;
 					
 						return 1 ;
 					}
-					armazenaVetor(diretorio[i].histograma, entrada->d_name, nomeDiretorio) ;
+					if (!(armazenaVetor(diretorio[i].histograma, entrada->d_name, nomeDiretorio))) {
+						printf("Erro ao armazenar vetor\n") ;
+						if (libera) {
+							liberaMatriz(imagem) ; 
+							liberaMatriz(LBP) ;
+						}
+						liberaMatriz(imagemDiretorio) ; 
+						liberaMatriz(LBP1) ;
+						free(concat) ;
+						free(nomeDiretorio) ;
+						free(diretorio) ;	
+						closedir(dir) ;
+						
+						return 1 ;
+					}
 					diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
 					
 					liberaMatriz(imagemDiretorio) ; 
 					liberaMatriz(LBP1) ;
 					free(concat) ;	
 					i++ ;
+				} else if (erro == -1) {
+					free(nomeImagem) ;
+					if (libera) {
+						liberaMatriz(imagem) ; 
+						liberaMatriz(LBP) ;
+					}	
+					free(nomeDiretorio) ;
+					free(diretorio) ;
+					closedir(dir) ;
+					
+					return 1 ; 
 				} else {
 					strcpy(diretorio[i].nome, entrada->d_name) ;
 					leVetorLBP(entrada->d_name, nomeDiretorio, diretorio[i].histograma) ;
