@@ -33,8 +33,7 @@ int main(int argc, char *argv[]) {
 	struct dirent *entrada ;
 	struct imagensDiretorio *diretorio ;
 	DIR *dir ;
-	unsigned short int erro ;
-	short int contI, contO, contD, caso1 ;
+	unsigned short int contI, contO, contD, caso1, erro, o, d, libera ;
 	float histograma1[256] ; 
 	long n, contVet, i, j, menor ;
 	char *nomeImagem, *saidaImagem, *nomeDiretorio, *concat ;
@@ -44,15 +43,25 @@ int main(int argc, char *argv[]) {
 		return 1 ;
 	}
 	
-	// Condicionais no if que retornam verificar variaveis nulas para 
-	// poder liberar memoria, inicia-las como nulas
+	nomeImagem = NULL ; 
+	saidaImagem = NULL ; 
+	nomeDiretorio = NULL ;
+	concat = NULL ;
+	diretorio = NULL ;
+	entrada = NULL ;
+	dir = NULL ;
 	
 	contI = 0 ;
 	contO = 0 ;
 	contD = 0 ;
 	contVet = 0 ;
+	// Diz se as matrizes foram alocadas dinamicamente
+	libera = 0 ;
 	i = 1 ;
-	// Verifica se é para gerar imagem ou comparar com outras imagens
+	// Impede que chamemos usemos as flags -d e -o juntos
+	d = 0 ;
+	o = 0 ;
+	// Verifica se é para gerar imagem(caso1) ou comparar com outras imagens(caso2)
 	caso1 = 0 ;
 	while ( i < argc - 1) {
 		// Retorna o tamanho da string
@@ -61,36 +70,95 @@ int main(int argc, char *argv[]) {
 			// Impede que a mesma flag se repita
 			if (contI > 0) {
 				printf("Argumentos inválidos\n") ;
+				if (saidaImagem != NULL) {
+					free(saidaImagem) ;
+				}
+				if (nomeDiretorio != NULL) {
+					free(nomeDiretorio) ;
+				}				
+				if (dir != NULL) {
+					closedir(dir) ;
+				}
+				if (diretorio != NULL) {
+					free(diretorio) ;
+				}				
+								
 				return 1 ;
 			}
 			// Aloca memória do tamanho do argumento
 			nomeImagem = (char*)malloc(n+1) ;
+			if (!nomeImagem) {
+				printf("Erro ao alocar memória\n") ;
+				if (saidaImagem != NULL) {
+					free(saidaImagem) ;
+				}
+				if (nomeDiretorio != NULL) {
+					free(nomeDiretorio) ;
+				}				
+				if (dir != NULL) {
+					closedir(dir) ;
+				}
+				if (diretorio != NULL) {
+					free(diretorio) ;
+				}	
+				return 1 ;
+			}
 			strcpy(nomeImagem, argv[i+1]);
 			nomeImagem[n] = '\0' ;
 			contI++ ;
-		} else if (strcmp(argv[i], "-o") == 0) {
+		} else if ((strcmp(argv[i], "-o") == 0) && (!d)) {
 			if (contO > 0) {
 				printf("Argumentos inválidos\n") ;
+				if (nomeImagem != NULL) {
+					free(nomeImagem) ;
+				}		
+				
 				return 1 ;
 			}
 			saidaImagem = (char*)malloc(n+1) ;
+			if (!saidaImagem) {
+				printf("Erro ao alocar memória\n") ;
+				if (nomeImagem != NULL) {
+					free(nomeImagem) ;
+				}				
+				return 1 ;
+			}
 			strcpy(saidaImagem, argv[i+1]);
 			saidaImagem[n] = '\0';
 			caso1 = 1 ;
+			o = 1 ;
 			contO++ ;
-		} else if ((strcmp(argv[i], "-d") == 0)) {
+		} else if (((strcmp(argv[i], "-d") == 0)) && (!o)) {
 			if (contD > 0) {
 				printf("Argumentos inválidos\n") ;
+				if (nomeImagem != NULL) {
+					free(nomeImagem) ;
+				}
+				
 				return 1 ;
 			}
 			dir = opendir(argv[i+1]) ;
-			nomeDiretorio = (char*)malloc(n+1) ;
-			strcpy(nomeDiretorio, argv[i+1]);
-			nomeDiretorio[n] = '\0' ;
 			if (!dir) { 
 				printf ("Erro ao abrir diretório\n") ;
+				if (nomeImagem != NULL) {
+					free(nomeImagem) ;
+				}
+				
 				return 1 ;
 			}
+			nomeDiretorio = (char*)malloc(n+1) ;
+			if (!nomeDiretorio) {
+				printf("Erro ao alocar memória\n") ;
+				if (nomeImagem != NULL) {
+					free(nomeImagem) ;
+				}
+				closedir(dir) ;
+				
+				return 1 ;
+			}
+			strcpy(nomeDiretorio, argv[i+1]);
+			nomeDiretorio[n] = '\0' ;
+			d = 1 ;
 			// Conta a quantidade de arquivos no diretorio
 			while ((entrada = readdir(dir)) != NULL) {
 				if ((entrada->d_type == DT_REG) ) {
@@ -102,6 +170,12 @@ int main(int argc, char *argv[]) {
 			diretorio = malloc(contVet * sizeof(struct imagensDiretorio)) ;
 			if (!diretorio) {
 				printf("Erro ao criar vetor de distancias\n") ;
+				if (nomeImagem != NULL) {
+					free(nomeImagem) ;
+				}
+				free(nomeDiretorio) ;			
+				closedir(dir) ;			
+				
 				return 1 ;
 			}		
 			// Volta ao início do diretório
@@ -110,42 +184,97 @@ int main(int argc, char *argv[]) {
 			contD++ ;
 		} else {
 			printf ("Argumentos inválidos\n") ;
+			if (nomeImagem != NULL) {
+				free(nomeImagem) ;
+			}
+			if (saidaImagem != NULL) {
+				free(saidaImagem) ;
+			}			
+			if (nomeDiretorio != NULL) {
+				free(nomeDiretorio) ;
+			}				
+			if (dir != NULL) {
+				closedir(dir) ;
+			}
+			if (diretorio != NULL) {
+				free(diretorio) ;
+			}			
+			
 			return 1 ;
 		}
 		i += 2 ;
 	}
 	
-	// Verificar variaveis nulas para saber o que liberar memória
+	// Entra apenas se estiver no caso1, ou não tiver vetor histograma e estiver no caso2
+	if (caso1 || (!(procuraVetorHistograma(nomeImagem, nomeDiretorio)) && !caso1)) {	
+		libera = 1 ;
+		erro = criaMatrizDeImagem(nomeImagem, &imagem) ;
+		if (erro) {
+			printf("Erro ao criar matriz de imagem\n") ;
+			free(nomeImagem) ;
+			if (saidaImagem != NULL) {
+				free(saidaImagem) ;
+			}			
+			if (nomeDiretorio != NULL) {
+				free(nomeDiretorio) ;
+			}				
+			if (dir != NULL) {
+				closedir(dir) ;
+			}
+			if (diretorio != NULL) {
+				free(diretorio) ;
+			}	
+			return 1 ; 
+		}
 		
-	erro = criaMatrizDeImagem(nomeImagem, &imagem) ;
-	if (erro) {
-		printf("Erro ao criar matriz de imagem\n") ;
-		free(nomeImagem) ;
-		free(nomeDiretorio) ;
-		free(diretorio) ;
-		closedir(dir) ;
+		if (!(criaMatrizLBP(imagem, &LBP))) {
+			printf("Erro ao criar matriz de LBP\n") ;
+			free(nomeImagem) ;
+			if (saidaImagem != NULL) {
+				free(saidaImagem) ;
+			}			
+			if (nomeDiretorio != NULL) {
+				free(nomeDiretorio) ;
+			}				
+			if (dir != NULL) {
+				closedir(dir) ;
+			}
+			if (diretorio != NULL) {
+				free(diretorio) ;
+			}			
+			return 1 ;
+		}
+		// Indica que não há histograma da imagem 
+		erro = -2 ;
+	}	
 		
-		return 1 ; 
-	}
-	
-	if (!(criaMatrizLBP(imagem, &LBP))) {
-		printf("Erro ao criar matriz de LBP\n") ;
-		return 1 ;
-	}
-	
 	if (caso1) {
 		if (!(criaImagemPGM(saidaImagem, LBP) )) {
 			printf("Erro ao criar arquivo PGM\n") ;
+			free(nomeImagem) ;
+			free(saidaImagem) ;
+			liberaMatriz(imagem) ;
+			liberaMatriz(LBP) ;
+			
 			return 1 ;
 		}
 		free(saidaImagem) ;
+	// Caso2	
 	} else {
 		i = 0 ;
-		if (!(procuraVetorHistograma(nomeImagem, nomeDiretorio))) {
+		if (erro == -2) {
 			if (!(criaHistograma(LBP, histograma1))) {
 				printf("Erro ao criar histograma1\n") ;
+				free(nomeImagem) ;
+				liberaMatriz(imagem) ;
+				liberaMatriz(LBP) ;
+				free(nomeDiretorio) ;
+				free(diretorio) ;
+				closedir(dir) ;
+				
 				return 1 ;
 			}
+			// Verificar erros de armazenaVetor e leVetorLBP
 			armazenaVetor(histograma1, nomeImagem, nomeDiretorio) ;
 		} else {
 			leVetorLBP(nomeImagem, nomeDiretorio, histograma1) ;
@@ -164,7 +293,6 @@ int main(int argc, char *argv[]) {
 					
 					erro = criaMatrizDeImagem(concat, &imagemDiretorio) ; 
 					if (erro) {
-						printf("\nEntrou\n");
 						contVet-- ;
 						free(concat) ;
 						
@@ -173,16 +301,34 @@ int main(int argc, char *argv[]) {
 					strcpy(diretorio[i].nome, entrada->d_name) ;
 					if(!(criaMatrizLBP(imagemDiretorio, &LBP1))) {
 						printf("Erro ao criar matriz LBP\n") ;
+						free(nomeImagem) ;
+						if (libera) {
+							liberaMatriz(imagem) ; 
+							liberaMatriz(LBP) ;
+						}	
+						free(nomeDiretorio) ;
+						free(diretorio) ;
+						closedir(dir) ;
+					
 						return 1 ;
 					}
 					if(!(criaHistograma(LBP1, diretorio[i].histograma))) {
 						printf("Erro ao criar histograma2\n") ;
+						free(nomeImagem) ;
+						if (libera) {
+							liberaMatriz(imagem) ; 
+							liberaMatriz(LBP) ;
+						}	
+						free(nomeDiretorio) ;
+						free(diretorio) ;
+						closedir(dir) ;
+					
 						return 1 ;
 					}
 					armazenaVetor(diretorio[i].histograma, entrada->d_name, nomeDiretorio) ;
 					diretorio[i].distancia = distanciaCartesiana(histograma1, diretorio[i].histograma) ;
 					
-					liberaMatriz(imagemDiretorio) ;
+					liberaMatriz(imagemDiretorio) ; 
 					liberaMatriz(LBP1) ;
 					free(concat) ;	
 					i++ ;
@@ -207,8 +353,10 @@ int main(int argc, char *argv[]) {
 		closedir(dir) ;
 	}
 	free(nomeImagem) ;
-	liberaMatriz(imagem) ;
-	liberaMatriz(LBP) ;
+	if (libera) {	
+		liberaMatriz(imagem) ;
+		liberaMatriz(LBP) ;
+	}
 	
 	return 0 ;
 }
